@@ -1,6 +1,6 @@
 import csv
 import math
-from pathlib import Path
+import io
 
 import streamlit as st
 
@@ -49,26 +49,48 @@ def analyze_company(company):
     }
 
 
-# 3. app.py와 같은 폴더의 CSV 파일을 읽습니다.
+# 3. 웹 화면에서 업로드한 CSV 파일을 읽습니다.
 st.set_page_config(page_title="기업분석 연습", layout="wide")
 st.title("나의 첫 기업자동분석 플랫폼")
 st.caption("가상 기업 데이터로 만든 학습용 앱 · 금액 단위: 억 원")
 
-data_path = Path(__file__).parent / "companies.csv"
+uploaded_file = st.file_uploader(
+    "분석할 기업 CSV 파일을 올려 주세요.",
+    type=["csv"],
+)
 
-if not data_path.exists():
-    st.error("app.py와 같은 폴더에 companies.csv를 저장해 주세요.")
+if uploaded_file is None:
+    st.info("CSV 파일을 업로드하면 분석 결과가 표시됩니다.")
     st.stop()
 
-with data_path.open("r", encoding="utf-8-sig", newline="") as file:
-    reader = csv.DictReader(file)
+try:
+    text = uploaded_file.getvalue().decode("utf-8-sig")
+    file = io.StringIO(text)
+    reader = csv.DictReader(file, strict=True)
 
     required_columns = {"name", "revenue", "operating_profit"}
+
     if not required_columns.issubset(reader.fieldnames or []):
-        st.error("CSV 첫 줄의 열 이름을 확인해 주세요.")
+        st.error(
+            "CSV 첫 줄에는 name, revenue, operating_profit이 있어야 합니다."
+        )
         st.stop()
 
     companies = list(reader)
+
+except UnicodeDecodeError:
+    st.error("파일의 문자 형식을 읽을 수 없습니다. CSV UTF-8 형식으로 저장해 주세요.")
+    st.stop()
+
+except csv.Error:
+    st.error("CSV 형식에 문제가 있습니다. 쉼표와 따옴표를 확인해 주세요.")
+    st.stop()
+
+if not companies:
+    st.warning("CSV에 기업 데이터가 없습니다.")
+    st.stop()
+
+st.success(f"{uploaded_file.name}: {len(companies)}개 기업을 불러왔습니다.")
 
 results = []
 for company in companies:
